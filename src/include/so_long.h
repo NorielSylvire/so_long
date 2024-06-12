@@ -6,7 +6,7 @@
 /*   By: fhongu <fhongu@student.42madrid.com>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/05/26 00:10:54 by fhongu            #+#    #+#             */
-/*   Updated: 2024/05/26 11:49:45 by fhongu           ###   ########.fr       */
+/*   Updated: 2024/06/07 21:12:07 by fhongu           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -23,5 +23,6 @@
 #  define XK_LATIN1
 # endif
 # include <X11/keysymdef.h>
+# include <X11/X.h>
 
 #endif
