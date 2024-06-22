@@ -6,16 +6,19 @@
 /*   By: fhongu <fhongu@student.42madrid.com>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/05/12 00:57:49 by fhongu            #+#    #+#             */
-/*   Updated: 2024/06/12 19:48:09 by fhongu           ###   ########.fr       */
+/*   Updated: 2024/06/23 00:57:03 by fhongu           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
 #include <libft.h>
 #include <mlx.h>
 #include <ft_printf.h>
+#include <get_next_line.h>
+#include <stdlib.h>
 #include <sys/time.h>
 #include "src/include/so_long.h"
-#define TILE_SIZE 32
+#include <fcntl.h>
+#define TILE_SIZE 64
 
 typedef struct s_data {
 	void	*img;
@@ -45,6 +48,10 @@ typedef struct s_vars {
 	int		x_offset;
 	int		y_offset;
 	int		keyspamming;
+	int		nplayers;
+	int		nexits;
+	int		ncollectibles;
+	char	*map;
 }	t_vars;
 
 typedef enum {less_red, more_green, less_blue, more_red, less_green, more_blue} colorstates;
@@ -112,7 +119,7 @@ int	render_frames(t_vars *vars)
 		while (vars->i < 1280)
 		{
 			vars->j = 0;
-			while (vars->j < 736)
+			while (vars->j < 768)
 			{
 				my_pixel_put(vars->img, vars->i + vars->x_offset,
 					vars->j + vars->y_offset,
@@ -162,7 +169,87 @@ int	render_frames(t_vars *vars)
 	return (0);
 }
 
-int	main(void)
+int	is_valid(char *filename, t_vars *vars)
+{
+	int		fd;
+	int		line_length;
+	int		is_rect;
+	int		i;
+	char	*next_line;
+	char	*map;
+
+	fd = open(filename, O_RDONLY);
+	is_rect = 1;
+	if (fd != -1)
+	{
+		map = malloc(sizeof (char));
+		next_line = get_next_line(fd);
+		line_length = ft_strlen(next_line) - ft_char_count(next_line, '\n');
+		while (next_line)
+		{
+			if (ft_strlen(next_line) - ft_char_count(next_line, '\n')
+				!= line_length)
+			{
+				ft_free((void **) &next_line);
+				is_rect = 0;
+				break ;
+			}
+			i = 0;
+			while (next_line[i])
+			{
+				if (next_line[i] == 'P')
+					vars->nplayers++;
+				else if (next_line[i] == 'E')
+					vars->nexits++;
+				else if (next_line[i] == 'C')
+					vars->ncollectibles++;
+				i++;
+			}
+			map = ft_append(map, next_line, 0, 1);
+			next_line = get_next_line(fd);
+		}
+	}
+	else
+		return (0);
+	ft_printf(map);
+	return (is_rect && !(vars->nplayers != 1 || vars->nexits != 1
+			|| vars->ncollectibles == 0));
+}
+
+int	check_file(char *filepath, t_vars *vars)
+{
+	int		len;
+	char	*filename;
+	char	*filetype;
+
+	vars->nplayers = 0;
+	vars->nexits = 0;
+	vars->ncollectibles = 0;
+	filename = ft_strrchr(filepath, '/');
+	if (!filename)
+		filename = filepath;
+	else
+		filename++;
+	len = ft_strlen(filename);
+	if (len < 5
+		|| ft_strncmp(".ber", ft_substr(filename, len - 4, len), 4) != 0)
+		return (0);
+	return (is_valid(filepath, vars));
+}
+
+int	check_params(int argc, char **argv, t_vars *vars)
+{
+	int	valid;
+
+	valid = 1;
+	if (argc != 2)
+		valid = 0;
+	else if (!check_file(argv[1], vars))
+		valid = 0;
+	return (valid);
+}
+
+int	main(int argc, char **argv)
 {
 	t_vars	vars;
 	t_data	img;
@@ -171,14 +258,16 @@ int	main(void)
 	int		char_height;
 	char	*addres;
 
+	if (!check_params(argc, argv, &vars))
+		return (0);
 	vars.key_pressed = 0;
 	vars.mlx = mlx_init();
-	vars.window = mlx_new_window(vars.mlx, 1280, 736, "My super duper window!");
-	img.img = mlx_new_image(vars.mlx, 1280, 736);
+	vars.window = mlx_new_window(vars.mlx, 1280, 768, "My super duper window!");
+	img.img = mlx_new_image(vars.mlx, 1280, 768);
 	img.addr = mlx_get_data_addr(img.img, &img.bits_per_pixel, &img.line_length,
 			&img.endian);
 	vars.img = &img;
-	addres = "./assets/tile000.xpm";
+	addres = "./assets/vampire.xpm";
 	character.img = mlx_xpm_file_to_image(vars.mlx, addres,
 			&char_width, &char_height);
 	character.addr = mlx_get_data_addr(character.img, &character.bits_per_pixel,
@@ -243,14 +332,14 @@ int	key_released(int keycode, t_vars *vars)
 	}
 	else if ((keycode == XK_w || keycode == XK_Up) && vars->player_y > 0)
 		vars->player_y--;
-	else if ((keycode == XK_s || keycode == XK_Down) && vars->player_y < 22)
+	else if ((keycode == XK_s || keycode == XK_Down) && vars->player_y < 11)
 		vars->player_y++;
 	else if ((keycode == XK_a || keycode == XK_Left) && vars->player_x > 0)
 		vars->player_x--;
-	else if ((keycode == XK_d || keycode == XK_Right) && vars->player_x < 39)
+	else if ((keycode == XK_d || keycode == XK_Right) && vars->player_x < 19)
 		vars->player_x++;
 	if (keycode == vars->key_pressed)
-		ft_printf("key released!\n");
+		ft_printf("player pos: (%d, %d)\n", vars->player_x, vars->player_y);
 	return (0);
 }
 
