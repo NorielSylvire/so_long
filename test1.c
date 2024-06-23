@@ -6,7 +6,7 @@
 /*   By: fhongu <fhongu@student.42madrid.com>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/05/12 00:57:49 by fhongu            #+#    #+#             */
-/*   Updated: 2024/06/23 00:57:03 by fhongu           ###   ########.fr       */
+/*   Updated: 2024/06/23 12:09:01 by fhongu           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -28,6 +28,11 @@ typedef struct s_data {
 	int		endian;
 }	t_data;
 
+typedef struct s_vector2 {
+	int	x;
+	int	y;
+}	t_vector2;
+
 typedef struct s_vars {
 	void	*mlx;
 	void	*window;
@@ -42,8 +47,9 @@ typedef struct s_vars {
 	int		r;
 	int		g;
 	int		b;
-	int		player_x;
-	int		player_y;
+	int			player_x;
+	int			player_y;
+	t_vector2	player_pos;
 	time_t	last_frame;
 	int		x_offset;
 	int		y_offset;
@@ -169,12 +175,31 @@ int	render_frames(t_vars *vars)
 	return (0);
 }
 
+int	can_be_solved(t_vars *vars)
+{
+	int	solvable;
+
+	solvable = 1;
+	/* Recursive alg starting from player pos, that fills everything with P
+	 * And counts the collectibles and exits. When everything has been filled,
+	 * it makes sure all the exits and collectibles have been accounted for.
+	 * It has a while loop with all four directions and checks all four of them,
+	 * then calls itself for each direction and after calling itself every time,
+	 * it replaces non wall tiles with P. In the end every collectible should
+	 * have been accounted for and the exit should also be reachable.
+	 * Test thoroughly.
+	 */
+	return (solvable);
+}
+
 int	is_valid(char *filename, t_vars *vars)
 {
 	int		fd;
 	int		line_length;
+	int		nb_lines;
 	int		is_rect;
 	int		i;
+	int		j;
 	char	*next_line;
 	char	*map;
 
@@ -184,6 +209,7 @@ int	is_valid(char *filename, t_vars *vars)
 	{
 		map = malloc(sizeof (char));
 		next_line = get_next_line(fd);
+		nb_lines = 0;
 		line_length = ft_strlen(next_line) - ft_char_count(next_line, '\n');
 		while (next_line)
 		{
@@ -192,13 +218,18 @@ int	is_valid(char *filename, t_vars *vars)
 			{
 				ft_free((void **) &next_line);
 				is_rect = 0;
+				ft_printf("Error\nThe map isn't rectangular.\n");
 				break ;
 			}
 			i = 0;
 			while (next_line[i])
 			{
 				if (next_line[i] == 'P')
+				{
+					vars->player_pos.x = i;
+					vars->player_pos.y = nb_lines;
 					vars->nplayers++;
+				}
 				else if (next_line[i] == 'E')
 					vars->nexits++;
 				else if (next_line[i] == 'C')
@@ -207,13 +238,57 @@ int	is_valid(char *filename, t_vars *vars)
 			}
 			map = ft_append(map, next_line, 0, 1);
 			next_line = get_next_line(fd);
+			nb_lines++;
 		}
 	}
 	else
+	{
+		ft_printf("Error\nFile '%s' doesn't exist or is unreadable.\n",
+			filename);
 		return (0);
+	}
 	ft_printf(map);
+	i = 0;
+	line_length++;
+	while (i < nb_lines)
+	{
+		if (i == 0 || i == nb_lines - 1)
+		{
+			j = 0;
+			while (j < line_length - 1)
+			{
+				if (map[i * line_length + j] != '1')
+				{
+					is_rect = 0;
+					ft_printf("Error\nThe map has a hole at %d:%d.\n", i, j);
+					break ;
+				}
+				j++;
+			}
+			if (!is_rect)
+				break ;
+		}
+		else
+		{
+			if (map[i * line_length] != '1'
+				|| map[(i + 1) * line_length - 2] != '1')
+			{
+				is_rect = 0;
+				ft_printf("Error\nThe map has a hole in line %d\n", i);
+				break ;
+			}
+		}
+		i++;
+	}
+	vars->map = map;
+	if (vars->nplayers != 1)
+		ft_printf("Error\nThere is more than one player position.\n");
+	else if (vars->nexits != 1)
+		ft_printf("Error\nThere is more than one exit.\n");
+	else if (vars->ncollectibles == 0)
+		ft_printf("Error\nThere are no collectibles in this map.\n");
 	return (is_rect && !(vars->nplayers != 1 || vars->nexits != 1
-			|| vars->ncollectibles == 0));
+			|| vars->ncollectibles == 0) && can_be_solved(vars));
 }
 
 int	check_file(char *filepath, t_vars *vars)
@@ -233,7 +308,13 @@ int	check_file(char *filepath, t_vars *vars)
 	len = ft_strlen(filename);
 	if (len < 5
 		|| ft_strncmp(".ber", ft_substr(filename, len - 4, len), 4) != 0)
+	{
+		if (len < 5)
+			ft_printf("Error\nFilename too short or incorrect file format.\n");
+		else
+			ft_printf("Error\nIncorrect file format.");
 		return (0);
+	}
 	return (is_valid(filepath, vars));
 }
 
@@ -243,7 +324,11 @@ int	check_params(int argc, char **argv, t_vars *vars)
 
 	valid = 1;
 	if (argc != 2)
+	{
+		ft_printf("Error\nInvalid number of arguments. %s",
+			"Usage: so_long <filepath>\n");
 		valid = 0;
+	}
 	else if (!check_file(argv[1], vars))
 		valid = 0;
 	return (valid);
