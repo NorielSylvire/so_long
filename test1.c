@@ -6,7 +6,7 @@
 /*   By: fhongu <fhongu@student.42madrid.com>       +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2024/05/12 00:57:49 by fhongu            #+#    #+#             */
-/*   Updated: 2024/06/23 12:09:01 by fhongu           ###   ########.fr       */
+/*   Updated: 2024/06/26 22:16:45 by fhongu           ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -50,13 +50,16 @@ typedef struct s_vars {
 	int			player_x;
 	int			player_y;
 	t_vector2	player_pos;
+	int			line_length;
 	time_t	last_frame;
 	int		x_offset;
 	int		y_offset;
 	int		keyspamming;
 	int		nplayers;
 	int		nexits;
+	int		accessible_exits;
 	int		ncollectibles;
+	int		accessible_collectibles;
 	char	*map;
 }	t_vars;
 
@@ -175,20 +178,53 @@ int	render_frames(t_vars *vars)
 	return (0);
 }
 
+void  fill_map(t_vars *vars, char *map, int x, int y)
+{
+	char		tile;
+
+	tile = map[x + y * vars->line_length + y];
+	if (tile == 'C')
+		vars->accessible_collectibles++;
+	else if (tile == 'E')
+		vars->accessible_exits++;
+	if (tile != '1' && tile != 'P')
+		map[x + y * vars->line_length + y] = 'P';
+	tile = map[x + 1 + y * vars->line_length + y];
+	if (tile == '0' || tile == 'C' || tile == 'E')
+		fill_map(vars, map, x + 1, y);
+	tile = map[x - 1 + y * vars->line_length + y];
+	if (tile == '0' || tile == 'C' || tile == 'E')
+		fill_map(vars, map, x - 1, y);
+	tile = map[x + (y + 1) * vars->line_length + y];
+	if (tile == '0' || tile == 'C' || tile == 'E')
+		fill_map(vars, map, x, y + 1);
+	tile = map[x + (y - 1) * vars->line_length + y];
+	if (tile == '0' || tile == 'C' || tile == 'E')
+		fill_map(vars, map, x, y - 1);
+}
+
 int	can_be_solved(t_vars *vars)
 {
-	int	solvable;
+	int		solvable;
+	int		maplen;
+	char	*mapcopy;
 
 	solvable = 1;
-	/* Recursive alg starting from player pos, that fills everything with P
-	 * And counts the collectibles and exits. When everything has been filled,
-	 * it makes sure all the exits and collectibles have been accounted for.
-	 * It has a while loop with all four directions and checks all four of them,
-	 * then calls itself for each direction and after calling itself every time,
-	 * it replaces non wall tiles with P. In the end every collectible should
-	 * have been accounted for and the exit should also be reachable.
-	 * Test thoroughly.
-	 */
+	maplen = ft_strlen(vars->map);
+	mapcopy = malloc(maplen * sizeof (char));
+	ft_strlcpy(mapcopy, vars->map, maplen);
+	ft_printf("%s\n", mapcopy);
+	vars->accessible_exits = 0;
+	vars->accessible_collectibles = 0;
+	fill_map(vars, mapcopy, vars->player_pos.x, vars->player_pos.y);
+	if (vars->accessible_exits != vars->nexits
+		|| vars->accessible_collectibles != vars->ncollectibles)
+	{
+		ft_printf("Error\nThis map cannot be solved.\n");
+		solvable = 0;
+	}
+	ft_printf("%s\n", mapcopy);
+	ft_free((void **) &mapcopy);
 	return (solvable);
 }
 
@@ -211,6 +247,7 @@ int	is_valid(char *filename, t_vars *vars)
 		next_line = get_next_line(fd);
 		nb_lines = 0;
 		line_length = ft_strlen(next_line) - ft_char_count(next_line, '\n');
+		vars->line_length = line_length;
 		while (next_line)
 		{
 			if (ft_strlen(next_line) - ft_char_count(next_line, '\n')
@@ -247,7 +284,6 @@ int	is_valid(char *filename, t_vars *vars)
 			filename);
 		return (0);
 	}
-	ft_printf(map);
 	i = 0;
 	line_length++;
 	while (i < nb_lines)
@@ -284,7 +320,7 @@ int	is_valid(char *filename, t_vars *vars)
 	if (vars->nplayers != 1)
 		ft_printf("Error\nThere is more than one player position.\n");
 	else if (vars->nexits != 1)
-		ft_printf("Error\nThere is more than one exit.\n");
+		ft_printf("Error\nThere is either no exit or more than one exit.\n");
 	else if (vars->ncollectibles == 0)
 		ft_printf("Error\nThere are no collectibles in this map.\n");
 	return (is_rect && !(vars->nplayers != 1 || vars->nexits != 1
